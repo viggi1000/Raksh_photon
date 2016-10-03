@@ -19,9 +19,11 @@ TCPClient client;
 PulseOximeter pox;
 Adafruit_MLX90614 mlx = Adafruit_MLX90614();
 int BPM,sp;
-float t;
+unsigned long t, period_respiration;
 uint32_t tsLastReport = 0;
 uint32_t tsLastReport1 = 0;
+int f;
+float peakValue = 0;
 
 // Callback (registered below) fired when a pulse is detected
 void onBeatDetected()
@@ -42,31 +44,48 @@ void setup()
 
 void loop()
 {
-     pox.update();
-     BPM=pox.getHeartRate();
-     sp=pox.getSpO2();
-     t=mlx.readObjectTempC();
-
+pox.update();
+BPM=pox.getHeartRate();
+sp=pox.getSpO2();
+float sensorValue=mlx.readObjectTempC();
+float threshold=mlx.readAmbientTempC();
 Serial.print("Heart rate:");
 Serial.print(BPM);
 Serial.print("bpm / SpO2:");
 Serial.print(sp);
 Serial.print("% ");
 Serial.print("Temp:");
-Serial.println(t);
+Serial.println(sensorValue);
+int i = 0;
+int sensorValue = mlx.readObjectTempC();
+  //  vals[i] = sensorValue;
+if (sensorValue > peakValue) 
+  {
+     t=millis();
+    peakValue = sensorValue;
+   // tot++;
+  }
+
+  if (sensorValue <= threshold) 
+  {
+    if (peakValue > threshold) {
+      // you have a peak value:
+     signed long currentTime = millis();
+      period_respiration = currentTime-t;
+      Serial.println(peakValue);
+      p = (float)period_respiration*6;
+      f=60000/p;
+    }
+  }   
 if (millis() - tsLastReport1 > 20000) {
   ThingSpeak.setField(1,BPM);
   ThingSpeak.setField(2,sp);
-  ThingSpeak.setField(3,t);
+  ThingSpeak.setField(3,f);
   ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
 Particle.publish("BPM", String(BPM));
 Particle.publish("spo2", String(sp));
-Particle.publish("temp", String(t));
+Particle.publish("RR", String(f));
 tsLastReport1 = millis();
 }
-//ThingSpeak.setField(1,BPM);
-//ThingSpeak.setField(2,sp);
-//ThingSpeak.setField(3,t);
-//ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
 
 }
